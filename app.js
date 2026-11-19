@@ -1,11 +1,15 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
+const MySQLStore = require("express-mysql-session")(session);
 const path = require("path");
 const db = require("./database/db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust Vercel's reverse proxy so secure cookies work over HTTPS
+app.set("trust proxy", 1);
 
 // ---------- View engine (EJS) ----------
 app.set("view engine", "ejs");
@@ -18,12 +22,24 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ---------- Sessions (login state) ----------
+// ---------- Sessions (persisted in TiDB/MySQL for Vercel serverless) ----------
+const sessionStore = new MySQLStore({
+    createDatabaseTable: true,
+    expiration: 1000 * 60 * 60 // 1 hour
+}, db);
+
 app.use(session({
+    key: "alumni_session_cookie",
     secret: process.env.SESSION_SECRET || "alumni-lab7-change-this-secret",
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 } // 1 hour
+    cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 // 1 hour
+    }
 }));
 
 // ---------- Values available in every EJS view ----------
@@ -38,7 +54,11 @@ app.use((req, res, next) => {
     res.locals.user = req.session.user || null;
     res.locals.currentPath = req.path;
     res.locals.title = "Alumni Management System";
-    res.locals.photoUrl = (file) => (file ? "/uploads/" + file : "/img/default-avatar.svg");
+    res.locals.photoUrl = (file) => {
+        if (!file) return "/img/default-avatar.svg";
+        if (file.startsWith("data:") || file.startsWith("http")) return file;
+        return "/uploads/" + file;
+    };
     next();
 });
 

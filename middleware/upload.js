@@ -1,11 +1,5 @@
-// Multer: profile photo upload (images only, max 2 MB)
+// Multer: profile photo upload (images only, max 2 MB) - Vercel Serverless Compatible
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-const crypto = require("crypto");
-
-const uploadDir = path.join(__dirname, "..", "public", "uploads");
-fs.mkdirSync(uploadDir, { recursive: true });
 
 const EXT_BY_TYPE = {
     "image/jpeg": ".jpg",
@@ -15,13 +9,7 @@ const EXT_BY_TYPE = {
 };
 
 const upload = multer({
-    storage: multer.diskStorage({
-        destination: (req, file, cb) => cb(null, uploadDir),
-        filename: (req, file, cb) => {
-            const unique = Date.now() + "-" + crypto.randomBytes(4).toString("hex");
-            cb(null, unique + EXT_BY_TYPE[file.mimetype]);
-        }
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (EXT_BY_TYPE[file.mimetype]) return cb(null, true);
@@ -29,22 +17,23 @@ const upload = multer({
     }
 });
 
-// Wrapper: instead of crashing, store the upload problem on req so the route can show it
+// Wrapper: store buffer as Base64 Data URL on req.file.filename so existing routes work unchanged
 function uploadPhoto(req, res, next) {
     upload.single("profile_photo")(req, res, (err) => {
         if (err) {
             req.uploadError = err.code === "LIMIT_FILE_SIZE"
                 ? "Profile photo must be smaller than 2 MB."
                 : err.message;
+        } else if (req.file && req.file.buffer) {
+            req.file.filename = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
         }
         next();
     });
 }
 
-// Delete a file from /public/uploads (ignore errors)
+// No local files to delete when stored in memory/DB
 function removeUpload(filename) {
-    if (!filename) return;
-    fs.unlink(path.join(uploadDir, path.basename(filename)), () => {});
+    // No-op in serverless mode
 }
 
 module.exports = { uploadPhoto, removeUpload };
