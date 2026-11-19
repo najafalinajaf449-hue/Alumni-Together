@@ -67,14 +67,19 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ---------- Start ----------
-app.listen(PORT, async () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    try {
-        await db.query("SELECT 1");
-        console.log("MySQL Connected Successfully");
-    } catch (err) {
-        console.log("Database connection FAILED: " + err.message);
-        console.log("Did you run database/schema.sql ? Check the credentials in database/db.js");
-    }
-});
+// ---------- Export for Vercel ----------
+module.exports = app;
+
+// ---------- Start (Local development only) ----------
+if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, async () => {
+        console.log(`Server running at http://localhost:${PORT}`);
+        try {
+            await db.query("SELECT 1");
+            console.log("MySQL Connected Successfully");
+        } catch (err) {
+            console.log("Database connection FAILED: " + err.message);
+            console.log("Did you run database/schema.sql ? Check the credentials in database/db.js");
+        }
+    });
+}
