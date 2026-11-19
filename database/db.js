@@ -1,14 +1,19 @@
-// MySQL connection pool (Lab 5/6 used a single connection; a pool is the upgraded version)
 const mysql = require("mysql2/promise");
+require("dotenv").config();
 
 const pool = mysql.createPool({
-    host: process.env.DB_HOST || "localhost",
-    user: process.env.DB_USER || "alumni_node",
-    password: process.env.DB_PASSWORD || "Node@123",
-    database: process.env.DB_NAME || "alumni_management",
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT) || 4000,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     waitForConnections: true,
-    connectionLimit: 10,
-    dateStrings: true // DATE columns come back as "YYYY-MM-DD" strings (easy to use in forms)
+    connectionLimit: 5,
+    queueLimit: 0,
+    ssl: {
+        minVersion: "TLSv1.2",
+        rejectUnauthorized: true
+    }
 });
 
 module.exports = pool;
